@@ -3,6 +3,8 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.distributed import DistributedSampler
 
+from typing import Dict, List, Tuple, Generic
+
 import torch
 import json
 import psutil
@@ -75,14 +77,14 @@ def infinite_loader(data_loader):
     while True:
         yield from data_loader
 
-def helper_tokenize(sentence_lst, vocab_dict, seq_len):
+def helper_tokenize(sentence_lst: Dict[str, List[str]], vocab_dict, seq_len) -> Dict[str, Dict[str, List[str]]]:
     # Process.memory_info is expressed in bytes, so convert to megabytes
     print(f"RAM used: {psutil.Process().memory_info().rss / (1024 * 1024):.2f} MB")
     raw_datasets = Dataset2.from_dict(sentence_lst)
     print(raw_datasets)
     print(f"RAM used: {psutil.Process().memory_info().rss / (1024 * 1024):.2f} MB")
 
-    def tokenize_function(examples):
+    def tokenize_function(examples: Dict[str, List[str]]) -> Dict[str, List[str]]:
         input_id_x = vocab_dict.encode_token(examples['src'])
         input_id_y = vocab_dict.encode_token(examples['trg'])
         result_dict = {'input_id_x': input_id_x, 'input_id_y': input_id_y}
@@ -101,7 +103,7 @@ def helper_tokenize(sentence_lst, vocab_dict, seq_len):
     print('### tokenized_datasets...example', tokenized_datasets['input_id_x'][0])
     print(f"RAM used: {psutil.Process().memory_info().rss / (1024 * 1024):.2f} MB")
 
-    def merge_and_mask(group_lst):
+    def merge_and_mask(group_lst: Dict[str, List[str]]) -> Dict[str, List[str]]:
         lst = []
         mask = []
         for i in range(len(group_lst['input_id_x'])):
@@ -156,7 +158,7 @@ def helper_tokenize(sentence_lst, vocab_dict, seq_len):
     return raw_datasets
 
 
-def get_corpus(data_args, seq_len, split='train', loaded_vocab=None):
+def get_corpus(data_args, seq_len, split='train', loaded_vocab=None) -> Dict[str, Dict[str, List[str]]]:
 
     print('#'*30, '\nLoading dataset {} from {}...'.format(data_args.dataset, data_args.data_dir))
 
@@ -190,7 +192,7 @@ def get_corpus(data_args, seq_len, split='train', loaded_vocab=None):
 
 
 class TextDataset(Dataset):
-    def __init__(self, text_datasets, data_args, model_emb=None):
+    def __init__(self, text_datasets: Dict[str, Dict[str, List[str]]], data_args, model_emb=None):
         super().__init__()
         self.text_datasets = text_datasets
         self.length = len(self.text_datasets['train'])
@@ -200,7 +202,7 @@ class TextDataset(Dataset):
     def __len__(self):
         return self.length
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
         with torch.no_grad():
 
             input_ids = self.text_datasets['train'][idx]['input_ids']
